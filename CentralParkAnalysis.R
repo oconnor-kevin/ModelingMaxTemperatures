@@ -1,6 +1,21 @@
 # Kevin O'Connor
 # 4/28/16
 
+### TABLE OF CONTENTS ###
+# README
+# Reading and cleaning data
+# Plots of Central Park Data
+# Deseasonalization
+# Parameter Estimation
+# Kernel (Weighting) Functions
+## Triangle Kernel
+## Epanechnikov Kernel
+# Bound function
+# Simulation Routines
+# TESTING
+
+# README
+# This file was created by Kevin O'Connor at the University of Chicago 
 # Analysis of Central Park temperature data.
 ## Reading and cleaning data.
 setwd("/Users/kevinoconnor/Documents/School/Research/")
@@ -10,7 +25,7 @@ temp_data$Low = temp_data$Low/10
 temp_data[which(temp_data$High == -999.9),2] = NaN
 temp_data[which(temp_data$Low == -999.9),3] = NaN
 
-## Plotting the data
+## Plots
 pdf("MaxTemps1876to1886.pdf", width=8, height=6)
 plot(temp_data$High[1:which(temp_data$Date == 18851231)], main="Daily Maximum Temperature for 1876 to 1886", ylab="Maximum Temperature (degrees Celsius)")
 dev.off()
@@ -29,235 +44,17 @@ dev.off()
 pdf("MaxTemps1984.pdf", width=8, height=6)
 plot(temp_data$High[which(temp_data$Date == 19840101):which(temp_data$Date == 19841231)], main="Daily Maximum Temperature for 1984", ylab="Maximum Temperature (degrees Celsius)")
 dev.off()
-
-## Carrying out triangle wave, uniform distribution simulation.
-u_0 = 22.5; u_1 = 12.5
-l_0 = 5; l_1 = 15
-a_0 = 365.25/2
-vals = runif(3650)
-for(i in 1:length(vals)){
-	u_in = u_1*triangle_wave(i,a_0) + u_0
-	l_in = l_1*triangle_wave(i,a_0) + l_0
-	vals[i] = (u_in - l_in)*vals[i] + l_in
-}
-pdf("TriangleBoundsUniformDistributionSimulation.pdf", width=13, height=8)
-plot(vals, main="Triangle Bounds with Uniform Distribution Simulation", ylab="Simulated Maximum Temperature (degrees Celsius)")
+pdf("DeseasonalizedMax.pdf", width=13, height=8)
+plot(deseas_hts, main="Deseasonalized Central Park Max Temperatures", ylab="Deseasonalized Max Temperature")
 dev.off()
-## Carrying out triangle wave, AR(1) process with uniform distribution simulation.
-vals = runif(3650)
-u_in = u_1*triangle_wave(1,a_0)+u_0
-l_in = l_1*triangle_wave(1,a_0)+l_0
-vals[1] = (u_in - l_in)*vals[1] + l_in
-for(i in 2:length(vals)){
-	u_in = u_1*triangle_wave(i,a_0) + u_0
-	l_in = l_1*triangle_wave(i,a_0) + l_0
-	vals[i] = (u_in - l_in)*vals[i] + l_in
-	vals[i] = mean(vals[i:(i-1)])
-}
-pdf("AR1UniformSimulation.pdf", width=13, height=8)
-plot(vals, main="Triangle Bounds and AR(1) Process with Uniform Distribution Simulation", ylab="Simulated Maximum Temperature (degrees Celsius)")
+pdf("DeseasonalizedMaxACF.pdf", width=8, height=6)
+acf(deseas_hts, lag=30)
 dev.off()
-### Repeating this example with different parametrizations.  
-#### AR(2)
-vals = runif(3650)
-u_in = u_1*triangle_wave(1,a_0)+u_0
-l_in = l_1*triangle_wave(1,a_0)+l_0
-vals[1] = (u_in - l_in)*vals[1] + l_in
-u_in = u_1*triangle_wave(2,a_0)+u_0
-l_in = l_1*triangle_wave(2,a_0)+l_0
-vals[2] = (u_in - l_in)*vals[2] + l_in
-for(i in 3:length(vals)){
-	u_in = u_1*triangle_wave(i,a_0) + u_0
-	l_in = l_1*triangle_wave(i,a_0) + l_0
-	vals[i] = (u_in - l_in)*vals[i] + l_in
-	vals[i] = mean(vals[(i-2):i])
-}
-pdf("AR2UniformSimulation.pdf", width=8, height=6)
-plot(vals, main="Triangle Bounds and AR(2) Process with Uniform Distribution Simulation", ylab="Simulated Maximum Temperature (degrees Celsius)")
-dev.off()
-pdf("AR2UniformSimulation1Year.pdf", width=13, height=8)
-plot(vals[1000:1365], main="Triangle Bounds and AR(2) Process with Uniform Distribution Simulation", ylab="Simulated Maximum Temperature (degrees Celsius)")
-dev.off()
-#### AR(5)
-vals = runif(3650)
-for(i in 1:5){
-	u_in = u_1*triangle_wave(i,a_0) + u_0
-	l_in = l_1*triangle_wave(i,a_0) + l_0
-	vals[i] = (u_in - l_in)*vals[i] + l_in
-}
-for(i in 6:length(vals)){
-	u_in = u_1*triangle_wave(i,a_0) + u_0
-	l_in = l_1*triangle_wave(i,a_0) + l_0
-	vals[i] = (u_in - l_in)*vals[i] + l_in
-	vals[i] = mean(vals[i:(i-5)])
-}
-pdf("AR5UniformSimulation.pdf", width=8, height=6)
-plot(vals, main="Triangle Bounds and AR(5) Process with Uniform Distribution Simulation", ylab="Simulated Maximum Temperature (degrees Celsius)")
-dev.off()
-#### AR(10)
-vals = runif(3650)
-for(i in 1:10){
-	u_in = u_1*triangle_wave(i,a_0) + u_0
-	l_in = l_1*triangle_wave(i,a_0) + l_0
-	vals[i] = (u_in - l_in)*vals[i] + l_in
-}
-for(i in 11:length(vals)){
-	u_in = u_1*triangle_wave(i,a_0) + u_0
-	l_in = l_1*triangle_wave(i,a_0) + l_0
-	vals[i] = (u_in - l_in)*vals[i] + l_in
-	vals[i] = mean(vals[i:(i-10)])
-}
-pdf("AR10UniformSimulation.pdf", width=8, height=6)
-plot(vals, main="Triangle Bounds and AR(10) Process with Uniform Distribution Simulation", ylab="Simulated Maximum Temperature (degrees Celsius)")
-dev.off()
-#### AR(20)
-vals = runif(3650)
-for(i in 1:20){
-	u_in = u_1*triangle_wave(i,a_0) + u_0
-	l_in = l_1*triangle_wave(i,a_0) + l_0
-	vals[i] = (u_in - l_in)*vals[i] + l_in
-}
-for(i in 21:length(vals)){
-	u_in = u_1*triangle_wave(i,a_0) + u_0
-	l_in = l_1*triangle_wave(i,a_0) + l_0
-	vals[i] = (u_in - l_in)*vals[i] + l_in
-	vals[i] = mean(vals[i:(i-20)])
-}
-pdf("AR20UniformSimulation.pdf", width=8, height=6)
-plot(vals, main="Triangle Bounds and AR(20) Process with Uniform Distribution Simulation", ylab="Simulated Maximum Temperature (degrees Celsius)")
-dev.off()
-pdf("AR20UniformSimulation1Year.pdf", width=13, height=8)
-plot(vals[250:615], main="Triangle Bounds and AR(20) Process with Uniform Distribution Simulation", ylab="Simulated Maximum Temperature (degrees Celsius)")
-dev.off()
-## Triangle wave, beta distribution simulation.
-u_0 = 60; l_0 = -40
-alpha = 10; beta = 10
-hist(rbeta(1000, alpha, beta), breaks = 20)
-### AR(0)
-vals = rbeta(3650, alpha, beta)
-for(i in 1:length(vals)){
-	u_in = u_1*triangle_wave(i,a_0)+u_0
-	l_in = l_1*triangle_wave(i,a_0)+l_0
-	vals[i] = (u_in - l_in)*vals[i] + l_in
-}
-pdf("AR0BetaSimulation.pdf", width=8, height=6)
-plot(vals, main="Triangle Bounds and AR(0) Process with Beta Distribution Simulation", ylab="Simulated Maximum Temperature (degrees Celsius)")
-dev.off()
-### AR(1)
-vals = rbeta(3650, alpha, beta)
-u_in = u_1*triangle_wave(1,a_0) + u_0
-l_in = l_1*triangle_wave(1,a_0) + l_0
-vals[1] = (u_in - l_in)*vals[1] + l_in
-for(i in 2:length(vals)){
-	u_in = u_1*triangle_wave(i,a_0) + u_0
-	l_in = l_1*triangle_wave(i,a_0) + l_0
-	vals[i] = (u_in - l_in)*vals[i] + l_in
-	vals[i] = mean(vals[i:(i-1)])
-}
-ar1_sim_data = vals
-pdf("AR1BetaSimulation.pdf", width=8, height=6)
-plot(vals, main="Triangle Bounds and AR(1) Process with Beta Distribution Simulation", ylab="Simulated Maximum Temperature (degrees Celsius)")
-dev.off()
-### AR(2)
-vals = rbeta(3650, alpha, beta)
-for(i in 1:2){
-	u_in = u_1*triangle_wave(i,a_0) + u_0
-	l_in = l_1*triangle_wave(i,a_0) + l_0
-	vals[i] = (u_in - l_in)*vals[i] + l_in
-}
-for(i in 3:length(vals)){
-	u_in = u_1*triangle_wave(i,a_0) + u_0
-	l_in = l_1*triangle_wave(i,a_0) + l_0
-	vals[i] = (u_in - l_in)*vals[i] + l_in
-	vals[i] = mean(vals[i:(i-2)])
-}
-ar2_sim_data = vals
-pdf("AR2BetaSimulation.pdf", width=8, height=6)
-plot(vals, main="Triangle Bounds and AR(2) Process with Beta Distribution Simulation", ylab="Simulated Maximum Temperature (degrees Celsius)")
-dev.off()
-### AR(3)
-vals = rbeta(3650, alpha, beta)
-for(i in 1:3){
-	u_in = u_1*triangle_wave(i,a_0) + u_0
-	l_in = l_1*triangle_wave(i,a_0) + l_0
-	vals[i] = (u_in - l_in)*vals[i] + l_in
-}
-for(i in 4:length(vals)){
-	u_in = u_1*triangle_wave(i,a_0) + u_0
-	l_in = l_1*triangle_wave(i,a_0) + l_0
-	vals[i] = (u_in - l_in)*vals[i] + l_in
-	vals[i] = mean(vals[i:(i-3)])
-}
-ar3_sim_data = vals
-pdf("AR3BetaSimulation.pdf", width=8, height=6)
-plot(vals, main="Triangle Bounds and AR(3) Process with Beta Distribution Simulation", ylab="Simulated Maximum Temperature (degrees Celsius)")
-dev.off()
-### AR(5)
-vals = rbeta(3650, alpha, beta)
-for(i in 1:5){
-	u_in = u_1*triangle_wave(i,a_0) + u_0
-	l_in = l_1*triangle_wave(i,a_0) + l_0
-	vals[i] = (u_in - l_in)*vals[i] + l_in
-}
-for(i in 6:length(vals)){
-	u_in = u_1*triangle_wave(i,a_0) + u_0
-	l_in = l_1*triangle_wave(i,a_0) + l_0
-	vals[i] = (u_in - l_in)*vals[i] + l_in
-	vals[i] = mean(vals[i:(i-5)])
-}
-ar5_sim_data = vals
-pdf("AR5BetaSimulation.pdf", width=8, height=6)
-plot(vals, main="Triangle Bounds and AR(5) Process with Beta Distribution Simulation", ylab="Simulated Maximum Temperature (degrees Celsius)")
-dev.off()
-### AR(10)
-vals = rbeta(3650, alpha, beta)
-for(i in 1:10){
-	u_in = u_1*triangle_wave(i,a_0) + u_0
-	l_in = l_1*triangle_wave(i,a_0) + l_0
-	vals[i] = (u_in - l_in)*vals[i] + l_in
-}
-for(i in 11:length(vals)){
-	u_in = u_1*triangle_wave(i,a_0) + u_0
-	l_in = l_1*triangle_wave(i,a_0) + l_0
-	vals[i] = (u_in - l_in)*vals[i] + l_in
-	vals[i] = mean(vals[i:(i-10)])
-}
-ar10_sim_data = vals
-pdf("AR10BetaSimulation.pdf", width=8, height=6)
-plot(vals, main="Triangle Bounds and AR(10) Process with Beta Distribution Simulation", ylab="Simulated Maximum Temperature (degrees Celsius)")
-dev.off()
-# Going to try and automate the simulation.
-sim_tbbeta <- function(p, t){
-	vals = rbeta(t, alpha, beta)
-	for(i in 1:p){
-		u_in = u_1*triangle_wave(i,a_0)+u_0
-		l_in = l_1*triangle_wave(i,a_0)+l_0
-		vals[i] = (u_in-l_in)*vals[i]+l_in
-	}
-	for(i in (p+1):length(vals)){
-		u_in = u_1*triangle_wave(i,a_0)+u_0
-		l_in = l_1*triangle_wave(i,a_0)+l_0
-		vals[i] = (u_in-l_in)*vals[i]+l_in
-		vals[i] = mean(vals[i:(i-p)])
-	}
-	return(vals)
-}
-
-# Comparing dependence to that of the data.
-pdf("ACFSimData.pdf", width=8, height=6)
-acf(vals, lag=1000, main="ACF Simulated Data")
-dev.off()
-pdf("ACFCentralParkData.pdf", width=8, height=6)
-acf(temp_data$High, lag=1000, na.action=na.pass, main="ACF Central Park Data")
-dev.off()
-pdf("PACFSimData.pdf", width=8, height=6)
-pacf(vals, lag=100, main="PACF Simulated Data")
-dev.off()
-pdf("PACFCentralParkData.pdf", width=8, height=6)
-pacf(temp_data$High, lag=100, na.action=na.pass, main="PACF Central Park Data")
+pdf("DeseasonalizedMaxPACF.pdf", width=8, height=6)
+pacf(deseas_hts, lag=30)
 dev.off()
 
-## 5/26/16 
+
 ## Deseasonalizing and comparing deseasonalized data to deseasonalized simulation data
 library(stats)
 library(zoo)
@@ -265,9 +62,6 @@ temp_data$High = na.approx(temp_data$High)
 temp_data_hts = ts(temp_data$High, start=c(1876, 1), deltat=1/365.25)
 dec_hts = stl(as.ts(temp_data_hts), "periodic", na.action=na.pass, s.window="period")$time.series
 deseas_hts = ts(dec_hts[,2]+dec_hts[,3], start=c(1876, 1), deltat=1/365.25)
-plot(deseas_hts, main="Deseasonalized Central Park Max Temperatures", ylab="Deseasonalized Max Temperature")
-acf(deseas_hts, lag=30)
-pacf(deseas_hts, lag=30)
 ### Deseasonalizing simulated data from triangle-bounded Beta model
 #### ar1
 ar1_sim_data = ts(ar1_sim_data, start=c(1876, 1), deltat=1/365)
@@ -295,36 +89,13 @@ plot(deseas_ar15)
 acf(deseas_ar15, lag=30)
 pacf(deseas_ar15, lag=30)
 
-## 5/29/16
-### Independent Beta simulation with triangle bounds.
-sim.length = 3650
-u_0 = 30
-vals = rbeta(sim.length, 10, 10)
-for(i in 1:sim.length){
-	u = u_1*triangle_wave(i,a_0)+u_0
-	l = l_1*triangle_wave(i,a_0)+l_0
-	vals[i] = (u-l)*vals[i] + l
-}
-pdf("IndependentBetaSimWithTriangleBounds.pdf", width=13, height=8)
-plot(vals, main="Simulation of Independent Beta with Triangle Bounds", ylab="Simulated Temperature")
-dev.off()
+
+## Parameter Estimation
 ### Fitting bounds to the data.
 plot(temp_data$High)
 u_0 = 45; u_1 = 0
 l_0 = -15; l_1 = 0
 delta = 0.1
-is_valid_bound <- function(u_0, u_1, l_0, l_1){
-	valid = T
-	for (i in 1:length(temp_data$High)){
-		if (!is.na(temp_data$High[i])){
-			if ((temp_data$High[i] > u_1*triangle_wave(i,a_0)+u_0) || (temp_data$High[i] < l_1*triangle_wave(i,a_0)+l_0) ){
-				valid = F
-				break
-			}
-		}
-	}
-	return(valid)
-}
 new_u_0 = 100
 new_u_1 = 0
 while(new_u_0 != u_0 || new_u_1 != u_1){
@@ -343,8 +114,24 @@ while(new_u_0 != u_0 || new_u_1 != u_1){
 ## Simulations
 ### Setting parameters
 a_0 = 365.25/2 # half period
-
-
+p = 10         # order
+alpha = 5      # beta shape parameter 1
+beta = 5       # beta shape parameter 2
+l_0 = -10      # parameters for bounds
+l_1 = 20
+u_0 = 50
+u_1 = 10
+### Generating data for all orders up to p=10.  
+p = 0
+unif_data = matrix(sim_unif_beta(3650), nrow=3650) # Initializing with p=0 case
+tri_data = matrix(sim_tri_beta(3650), nrow=3650)
+epa_data = matrix(sim_epa_beta(3650), nrow=3650)
+for (i in 1:10){
+	p = i # Setting order
+	unif_data = cbind(unif_data, sim_unif_beta(3650)) # Generating data
+	tri_data = cbind(tri_data, sim_tri_beta(3650))
+	epa_data = cbind(epa_data, sim_epa_beta(3650))
+}
 
 ## Kernel Functions
 ### Triangle kernel
@@ -362,9 +149,99 @@ triangle_wave <- function(t,a){
 	return((2/a)*(t-a*floor(t/a+1/2))*(-1)^(floor(t/a+1/2)))
 }
 
+## Simulation routines
+### AR Beta Simulation with Arbitrary Weighting Vector
+#### w is a weight vector of length p+1 which should sum to 1 and be in order from i=0 to p
+#### Initialize p, alpha, beta, u_1, l_1, u_0, l_0, a_0
+sim_beta <- function(t, w){
+	pre_vals = rbeta(p, alpha, beta) # Beta variables used just for initialization
+	vals = rbeta(t, alpha, beta) # Beta variables
+	ss_vals = c() # Shifted beta variables
+	for(i in (p+1):(length(vals)+p)){
+		vals[i-p] = sum(w*(c(pre_vals, vals)[i:(i-p)])) # Applying weight vector
+		u_in = u_1*triangle_wave(i,a_0)+u_0 # Creating bounds
+		l_in = l_1*triangle_wave(i,a_0)+l_0
+		ss_vals = c(ss_vals, (u_in - l_in)*vals[i-p]+l_in) # Shifting and scaling beta variable
+	}
+	return(ss_vals)
+}
+### Uniform Weighting AR Beta Simulation
+#### Initialize p, alpha, beta, u_1, l_1, u_0, l_0, a_0
+sim_unif_beta <- function(t){
+	return(sim_beta(t, rep(1,p+1)/(p+1)))
+}
+### Triangle Weighting AR Beta Simulation
+sim_tri_beta <- function(t){
+	return(sim_beta(t, tri_kernel(seq(0,p),p)))	
+}
+### Epanechnikov Weighting AR Beta Simulation
+sim_epa_beta <- function(t){
+	return(sim_beta(t, epa_kernel(seq(0,p),p)))
+}
+
+## Bound fitting routines
+### Checks that bounds are valid
+#### Initialize a_0
+is_valid_bound <- function(u_0, u_1, l_0, l_1, x){
+	valid = T
+	for (i in 1:length(x)){
+		if (!is.na(x[i])){
+			if ((x[i] > u_1*triangle_wave(i,a_0)+u_0) || (x[i] < l_1*triangle_wave(i,a_0)+l_0) ){
+				valid = F
+				break
+			}
+		}
+	}
+	return(valid)
+}
+### Optimize upper bound
+#### Initialize delta
+optimize_upper_bound <- function(h_0, h_1, x){
+	done = F
+	while(!done){
+		if(is_valid_bound(h_0-delta, h_1+delta, -Inf, 0)){
+			h_0 = h_0 - delta
+			h_1 = h_1 + delta	
+		} else if (is_valid_bound(h_0-delta, h_1, -Inf, 0)){
+			h_0 = h_0 - delta
+		} else if (is_valid_bound(h_0, h_1+delta, -Inf, 0)){
+			h_1 = h_1 + delta
+		} else {
+			done = T
+		}
+	}
+}
+### Optimize lower bound
+#### Initialize delta
+optimize_lower_bound <- function(h_0, h_1, x){
+	done = F
+	while(!done){
+		if(is_valid_bound(h_0-delta, h_1+delta, -Inf, 0)){
+			h_0 = h_0 - delta
+			h_1 = h_1 + delta	
+		} else if (is_valid_bound(h_0-delta, h_1, -Inf, 0)){
+			h_0 = h_0 - delta
+		} else if (is_valid_bound(h_0, h_1+delta, -Inf, 0)){
+			h_1 = h_1 + delta
+		} else {
+			done = T
+		}
+	}
+}
+
+
+
 ## TESTING ##
+
 ### Testing kernels
 sum(tri_kernel(seq(0,15), 15)) == 1
 sum(epa_kernel(seq(0,15), 15)) == 1
 tri_kernel(seq(0,15), 15) > 0
 epa_kernel(seq(0,15), 15) > 0
+
+### Testing simulation routines
+p=5; alpha=3; beta=3; a_0 = 365.25
+u_1 = 10; u_0 = 70; l_1 = 10; l_0 = -10
+plot(sim_unif_beta(3650))
+plot(sim_tri_beta(3650))
+plot(sim_epa_beta(3650))
