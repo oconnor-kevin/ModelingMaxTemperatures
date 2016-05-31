@@ -12,6 +12,8 @@
 # Bound functions
 # Simulation routines
 # Bound fitting routines
+# Standardization function
+# Weighting coefficients estimation function
 # TESTING
 
 # README
@@ -56,6 +58,17 @@ dev.off()
 pdf("DeseasonalizedMaxPACF.pdf", width=8, height=6)
 pacf(deseas_hts, lag=30)
 dev.off()
+pdf("EstimatedBoundsMax.pdf", width=13, height=8)
+plot(temp_data$High[1:1000], main="Daily Maximum Temperature with Fitted Triangle Wave Bounds", ylim=c(-25,60), ylab="Daily Maximum Temperature")
+points(upper_params[[1]][2]*triangle_wave(seq(1,1000)-upper_params[[1]][3],a_0)+upper_params[[1]][1])
+points(lower_params[[1]][2]*triangle_wave(seq(1,1000)-lower_params[[1]][3],a_0)+lower_params[[1]][1])
+dev.off()
+pdf("MaxTempsWithoutEstimatedBounds.pdf", width=13, height=8)
+plot(unseason_data, main="Daily Maximum Temperature Deseasonalized Based on Estimated Bounds", ylab="Standardized Daily Maximum Temperature")
+dev.off()
+pdf("MaxTempsWithoutEstimatedBoundsPACF.pdf", width=13, height=8)
+pacf(unseason_data)
+dev.off()
 
 
 ## Deseasonalizing and comparing deseasonalized data to deseasonalized simulation data
@@ -72,11 +85,23 @@ deseas_hts = ts(dec_hts[,2]+dec_hts[,3], start=c(1876, 1), deltat=1/365.25)
 #### To save on computation time, we will fit the model using a random subset of the data
 inds = sample(seq(1,length(temp_data$High)), 1000) # Generate random indices
 fit_data = temp_data$High[inds] # Store selected data
-delta = 0.01; a_0 = 365.25/2; delta_s = 0.5 # Initialize for bound optimization
+delta = 0.01; a_0 = 365.25/2; delta_s = 0.5; shift = -241.5 # Initialize for bound optimization
 u_0 = 40; u_1 = 0; l_0 = -15; l_1 = 0
 upper_params = optimize_upper_bound(u_0,u_1,temp_data$High[1:1000]) # Generate upper bounds
 lower_params = optimize_lower_bound(l_0,l_1,temp_data$High[1:1000]) # Generate lower bounds
-
+### Deseasonalizing based on the estimated bounds.
+unseason_data = standardize_data(upper_params[[1]][1], upper_params[[1]][2], lower_params[[1]][1], lower_params[[1]][2], upper_params[[1]][3], temp_data$High)
+### Estimating alpha and beta.  
+#### Minimize AICc over order of the model.
+library(sme)
+AICc_vals = c()
+for (i in 1:100){
+	AICc_vals = c(AICc_vals, AICc(estimate_weights(i, unseason_data)))
+}
+AICc_vals
+which(AICc_vals == min(AICc_vals))
+summary(estimate_weights(22, unseason_data))
+b_tn = estimate_weights(22,unseason_data)$resid
 
 ## Simulations
 ### Setting parameters
@@ -208,6 +233,30 @@ optimize_lower_bound <- function(h_0, h_1, x){
 		}
 	}
 	return(list(c(h_0, h_1, shift)))
+}
+
+
+## Standardization function
+### Initialize a_0
+standardize_data <- function(u_0_0, u_1_0, l_0_0, l_1_0, sh, x){
+	std_vals = x
+	for (i in 1:length(x)){
+		u = u_1_0*shift_triangle_wave(i, a_0, sh)+u_0_0
+		l = l_1_0*shift_triangle_wave(i, a_0, sh)+l_0_0
+		std_vals[i] = (x[i] - l)/(u-l)
+	}
+	return(std_vals)
+}
+
+
+## Weighting coefficients estimation function
+estimate_weights <- function(order, x){
+	reg_x = matrix(c(x[-(1:order)]), nrow=(length(x)-order))
+	for (i in 1:order){
+		reg_x = cbind(reg_x, x[(order+1-i):(length(x)-i)])
+	}
+	reg_x = data.frame(reg_x)
+	return(lm(X1~.+0,reg_x))
 }
 
 
