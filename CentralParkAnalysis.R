@@ -4,18 +4,20 @@
 ### TABLE OF CONTENTS ###
 # README
 # Reading and cleaning data
-# Plots of Central Park Data
+# Plots of Central Park data
 # Deseasonalization
-# Parameter Estimation
-# Kernel (Weighting) Functions
-## Triangle Kernel
-## Epanechnikov Kernel
-# Bound function
-# Simulation Routines
+# Parameter estimation
+# Simulations
+# Kernel (weighting) functions
+# Bound functions
+# Simulation routines
+# Bound fitting routines
 # TESTING
 
 # README
-# This file was created by Kevin O'Connor at the University of Chicago 
+# This file was created by Kevin O'Connor at the University of Chicago as part of a research project on Extreme Temperature Models under Michael Stein.  The paper for which this code was written can be found on my GitHub (https://github.com/oconnor-kevin).  Please email me at oconnor.kevin.ant@gmail.com with any questions or comments.
+
+
 # Analysis of Central Park temperature data.
 ## Reading and cleaning data.
 setwd("/Users/kevinoconnor/Documents/School/Research/")
@@ -24,6 +26,7 @@ temp_data$High = temp_data$High/10
 temp_data$Low = temp_data$Low/10
 temp_data[which(temp_data$High == -999.9),2] = NaN
 temp_data[which(temp_data$Low == -999.9),3] = NaN
+
 
 ## Plots
 pdf("MaxTemps1876to1886.pdf", width=8, height=6)
@@ -62,54 +65,18 @@ temp_data$High = na.approx(temp_data$High)
 temp_data_hts = ts(temp_data$High, start=c(1876, 1), deltat=1/365.25)
 dec_hts = stl(as.ts(temp_data_hts), "periodic", na.action=na.pass, s.window="period")$time.series
 deseas_hts = ts(dec_hts[,2]+dec_hts[,3], start=c(1876, 1), deltat=1/365.25)
-### Deseasonalizing simulated data from triangle-bounded Beta model
-#### ar1
-ar1_sim_data = ts(ar1_sim_data, start=c(1876, 1), deltat=1/365)
-dec_ar1 = stl(as.ts(ar1_sim_data), "periodic", s.window="period")$time.series
-deseas_ar1 = ts(dec_ar1[,2]+dec_ar1[,3], deltat=1/365, start=c(1876, 1))
-plot(deseas_ar1)
-acf(deseas_ar1, lag=30)
-pacf(deseas_ar1, lag=30)
-#### ar5
-ar5_sim_data = ts(ar5_sim_data, start=c(1876,1), deltat=1/365)
-dec_ar5 = stl(as.ts(ar5_sim_data), "periodic", s.window="period")$time.series
-deseas_ar5 = ts(dec_ar5[,2]+dec_ar5[,3], deltat=1/365, start=c(1876,1))
-plot(deseas_ar5)
-acf(deseas_ar5, lag=30)
-pacf(deseas_ar5, lag=30)
-#### ar15
-alpha=3; beta=3
-ar15_sim_data = ts(sim_tbbeta(15,10*365), start=c(1876,1), deltat=1/365)
-dec_ar15 = stl(as.ts(ar15_sim_data), "periodic", s.window="period")$time.series
-deseas_ar15 = ts(dec_ar15[,2]+dec_ar15[,3], deltat=1/365, start=c(1876,1))
-plot(ar15_sim_data, ylim=c(-50, 100))
-points(time(ar15_sim_data), triangle_wave(1:3650, a_0)*u_1+u_0)
-points(time(ar15_sim_data), triangle_wave(1:3650, a_0)*l_1+l_0)
-plot(deseas_ar15)
-acf(deseas_ar15, lag=30)
-pacf(deseas_ar15, lag=30)
 
 
 ## Parameter Estimation
 ### Fitting bounds to the data.
-plot(temp_data$High)
-u_0 = 45; u_1 = 0
-l_0 = -15; l_1 = 0
-delta = 0.1
-new_u_0 = 100
-new_u_1 = 0
-while(new_u_0 != u_0 || new_u_1 != u_1){
-	if(is_valid_bound(u_0-delta, u_1+delta, l_0, l_1)){
-		new_u_0 = u_0 - delta
-		new_u_1 = u_1 + delta	
-	} else if(is_valid_bound(u_0-delta, u_1, l_0, l_1)) {
-		new_u_0 = u_0 - delta
-	} else if(is_valid_bound(u_0, u_1+delta, l_0, l_1)) {
-		new_u_1 = u_1 + delta
-	} 
-	u_0 = new_u_0
-	u_1 = new_u_1
-}
+#### To save on computation time, we will fit the model using a random subset of the data
+inds = sample(seq(1,length(temp_data$High)), 1000) # Generate random indices
+fit_data = temp_data$High[inds] # Store selected data
+delta = 0.01; a_0 = 365.25/2; delta_s = 0.5 # Initialize for bound optimization
+u_0 = 40; u_1 = 0; l_0 = -15; l_1 = 0
+upper_params = optimize_upper_bound(u_0,u_1,temp_data$High[1:1000]) # Generate upper bounds
+lower_params = optimize_lower_bound(l_0,l_1,temp_data$High[1:1000]) # Generate lower bounds
+
 
 ## Simulations
 ### Setting parameters
@@ -133,6 +100,7 @@ for (i in 1:10){
 	epa_data = cbind(epa_data, sim_epa_beta(3650))
 }
 
+
 ## Kernel Functions
 ### Triangle kernel
 tri_kernel <- function(i, p){
@@ -143,11 +111,17 @@ epa_kernel <- function(i, p){
 	return((3*p^2+6*p-3*i^2-3*i+2)/(2*(p+1)^3))
 }
 
-## Bound function
+
+## Bound functions
 ### Triangle wave
 triangle_wave <- function(t,a){
 	return((2/a)*(t-a*floor(t/a+1/2))*(-1)^(floor(t/a+1/2)))
 }
+### Triangle wave with shift
+shift_triangle_wave <- function(t,a,s){
+	return(triangle_wave((t-s), a))
+}
+
 
 ## Simulation routines
 ### AR Beta Simulation with Arbitrary Weighting Vector
@@ -179,14 +153,15 @@ sim_epa_beta <- function(t){
 	return(sim_beta(t, epa_kernel(seq(0,p),p)))
 }
 
+
 ## Bound fitting routines
 ### Checks that bounds are valid
-#### Initialize a_0
-is_valid_bound <- function(u_0, u_1, l_0, l_1, x){
+#### Initialize a_0, shift
+is_valid_bound <- function(u_0, u_1, l_0, l_1, shift, x){
 	valid = T
 	for (i in 1:length(x)){
 		if (!is.na(x[i])){
-			if ((x[i] > u_1*triangle_wave(i,a_0)+u_0) || (x[i] < l_1*triangle_wave(i,a_0)+l_0) ){
+			if ((x[i] > u_1*triangle_wave(i-shift,a_0)+u_0) || (x[i] < l_1*triangle_wave(i-shift,a_0)+l_0) ){
 				valid = F
 				break
 			}
@@ -195,40 +170,45 @@ is_valid_bound <- function(u_0, u_1, l_0, l_1, x){
 	return(valid)
 }
 ### Optimize upper bound
-#### Initialize delta
+#### Initialize delta, a_0, delta_s
 optimize_upper_bound <- function(h_0, h_1, x){
 	done = F
 	while(!done){
-		if(is_valid_bound(h_0-delta, h_1+delta, -Inf, 0)){
+		if(is_valid_bound(h_0-delta, h_1+delta, -Inf, 0, shift, x)){
 			h_0 = h_0 - delta
 			h_1 = h_1 + delta	
-		} else if (is_valid_bound(h_0-delta, h_1, -Inf, 0)){
+		} else if (is_valid_bound(h_0-delta, h_1, -Inf, 0, shift, x)){
 			h_0 = h_0 - delta
-		} else if (is_valid_bound(h_0, h_1+delta, -Inf, 0)){
+		} else if (is_valid_bound(h_0, h_1+delta, -Inf, 0, shift, x)){
 			h_1 = h_1 + delta
+		} else if (is_valid_bound(h_0, h_1, -Inf, 0, shift-delta_s, x)){
+			shift = shift-delta_s
 		} else {
 			done = T
 		}
 	}
+	return(list(c(h_0, h_1, shift)))
 }
 ### Optimize lower bound
-#### Initialize delta
+#### Initialize delta, a_0, delta_s
 optimize_lower_bound <- function(h_0, h_1, x){
 	done = F
 	while(!done){
-		if(is_valid_bound(h_0-delta, h_1+delta, -Inf, 0)){
-			h_0 = h_0 - delta
+		if(is_valid_bound(Inf, 0, h_0+delta, h_1+delta, shift, x)){
+			h_0 = h_0 + delta
 			h_1 = h_1 + delta	
-		} else if (is_valid_bound(h_0-delta, h_1, -Inf, 0)){
-			h_0 = h_0 - delta
-		} else if (is_valid_bound(h_0, h_1+delta, -Inf, 0)){
+		} else if (is_valid_bound(Inf, 0, h_0+delta, h_1, shift, x)){
+			h_0 = h_0 + delta
+		} else if (is_valid_bound(Inf, 0, h_0, h_1+delta, shift, x)){
 			h_1 = h_1 + delta
+		} else if (is_valid_bound(Inf, 0, h_0, h_1, shift-delta_s, x)){
+			shift = shift-delta_s
 		} else {
 			done = T
 		}
 	}
+	return(list(c(h_0, h_1, shift)))
 }
-
 
 
 ## TESTING ##
@@ -245,3 +225,13 @@ u_1 = 10; u_0 = 70; l_1 = 10; l_0 = -10
 plot(sim_unif_beta(3650))
 plot(sim_tri_beta(3650))
 plot(sim_epa_beta(3650))
+
+### Testing bound optimization
+delta = 0.01; a_0 = 365.25/2; delta_s = 0.5
+shift = a_0/2 - (which(triangle_wave(seq(1,1000),365.25/2)==min(triangle_wave(seq(1,1000), 365.25/2))) - which(temp_data$High[1:1000]==min(temp_data$High[1:1000])))
+u_0 = 40; u_1 = 0; l_0 = -15; l_1 = 0
+upper_params = optimize_upper_bound(u_0,u_1,temp_data$High[1:1000])
+lower_params = optimize_lower_bound(l_0,l_1,temp_data$High[1:1000])
+plot(temp_data$High[1:1000], ylim=c(-20,60))
+points(upper_params[[1]][2]*triangle_wave(seq(1,1000)-upper_params[[1]][3],a_0)+upper_params[[1]][1])
+points(lower_params[[1]][2]*triangle_wave(seq(1,1000)-lower_params[[1]][3],a_0)+lower_params[[1]][1])
