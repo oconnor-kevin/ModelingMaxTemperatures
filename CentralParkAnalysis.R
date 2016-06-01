@@ -13,7 +13,8 @@
 # Simulation routines
 # Bound fitting routines
 # Standardization function
-# Weighting coefficients estimation function
+# Dependence removal function
+# Alpha/Beta estimation functions
 # TESTING
 
 # README
@@ -69,6 +70,57 @@ dev.off()
 pdf("MaxTempsWithoutEstimatedBoundsPACF.pdf", width=13, height=8)
 pacf(unseason_data)
 dev.off()
+pdf("MaxTempsAlphaBetaEstimationUniform.pdf", width=8, height=6)
+plot(unif_alphas, pch=20, main="Alpha and Beta vs. Autoregressive Order for Uniform Weighting", xlab="Order", ylab="")
+points(unif_betas, pch=1)
+legend("topright", legend=c("alpha", "beta"), pch=c(20,1))
+dev.off()
+pdf("MaxTempsAlphaBetaEstimationTri.pdf", width=8, height=6)
+plot(tri_alphas, pch=20, main="Alpha and Beta vs. Autoregressive Order for Triangle Weighting", xlab="Order", ylab="")
+points(tri_betas, pch=1)
+legend("topright", legend=c("alpha", "beta"), pch=c(20,1))
+dev.off()
+pdf("MaxTempsAlphaBetaEstimationEpa.pdf", width=8, height=6)
+plot(epa_alphas, pch=20, main="Alpha and Beta vs. Autoregressive Order for Epanechnikov Weighting", xlab="Order", ylab="")
+points(epa_betas, pch=1)
+legend("topright", legend=c("alpha", "beta"), pch=c(20,1))
+dev.off()
+pdf("UnifSimAR1.pdf", width=8, height=6)
+plot(unif_sim_data[,1], main="Uniform Weighting AR(1) Simulation", ylab="Simulated Temperature", ylim=c(-20,50))
+dev.off()
+pdf("UnifSimAR2.pdf", width=8, height=6)
+plot(unif_sim_data[,2], main="Uniform Weighting AR(2) Simulation", ylab="Simulated Temperature", ylim=c(-20,50))
+dev.off()
+pdf("TriSimAR1.pdf", width=8, height=6)
+plot(tri_sim_data[,1], main="Triangle Weighting AR(1) Simulation", ylab="Simulated Temperature", ylim=c(-20,50))
+dev.off()
+pdf("TriSimAR2.pdf", width=8, height=6)
+plot(tri_sim_data[,2], main="Triangle Weighting AR(2) Simulation", ylab="Simulated Temperature", ylim=c(-20,50))
+dev.off()
+pdf("EpaSimAR1.pdf", width=8, height=6)
+plot(epa_sim_data[,1], main="Epanechnikov Weighting AR(1) Simulation", ylab="Simulated Temperature", ylim=c(-20,50))
+dev.off()
+pdf("EpaSimAR2.pdf", width=8, height=6)
+plot(epa_sim_data[,2], main="Epanechnikov Weighting AR(2) Simulation", ylab="Simulated Temperature", ylim=c(-20,50))
+dev.off()
+pdf("TriSimAR2Max.pdf", width=8, height=6)
+hist(tri_maxes[,2], main="Simulated Annual Maxima for Triangle Weighted AR(2)", xlab="Simulated Annual Max Temperature")
+dev.off()
+pdf("TriSimAR2MaxInds.pdf", width=8, height=6)
+hist(tri_max_inds[,2], main="Indices of Simulated Annual Maxima for Triangle Weighted AR(2)", xlab="Indices of Simulated Annual Max Temperature")
+dev.off()
+pdf("EpaSimAR2Max.pdf", width=8, height=6)
+hist(epa_maxes[,2], main="Simulated Annual Maxima for Epanechnikov Weighted AR(2)", xlab="Simulated Annual Max Temperature")
+dev.off()
+pdf("EpaSimAR2MaxInds.pdf", width=8, height=6)
+hist(epa_max_inds[,2], main="Indices of Simulated Annual Maxima for Epanechnikov Weighted AR(2)", xlab="Indices of Simulated Annual Max Temperature")
+dev.off()
+pdf("TriSimAR2MaxGEVDiag.pdf", width=13, height=8)
+gev.diag(fit_tri_max)
+dev.off()
+pdf("EpaSimAR2MaxGEVDiag.pdf", width=13, height=8)
+gev.diag(fit_epa_max)
+dev.off()
 
 
 ## Deseasonalizing and comparing deseasonalized data to deseasonalized simulation data
@@ -92,38 +144,76 @@ lower_params = optimize_lower_bound(l_0,l_1,temp_data$High[1:1000]) # Generate l
 ### Deseasonalizing based on the estimated bounds.
 unseason_data = standardize_data(upper_params[[1]][1], upper_params[[1]][2], lower_params[[1]][1], lower_params[[1]][2], upper_params[[1]][3], temp_data$High)
 ### Estimating alpha and beta.  
-#### Minimize AICc over order of the model.
-library(sme)
-AICc_vals = c()
-for (i in 1:100){
-	AICc_vals = c(AICc_vals, AICc(estimate_weights(i, unseason_data)))
+indep_unif_data = c(); unif_alphas = c(); unif_betas = c()
+indep_tri_data = c(); tri_alphas = c(); tri_betas = c()
+indep_epa_data = c(); epa_alphas = c(); epa_betas = c()
+for(i in 1:10){
+	indep_unif_data = cbind(indep_unif_data, na.approx(remove_dependence(i, rep(1,i+1)/(i+1), unseason_data)))
+	indep_tri_data = cbind(indep_tri_data, na.approx(remove_dependence(i, tri_kernel(seq(0,i),i), unseason_data)))
+	indep_epa_data = cbind(indep_epa_data, na.approx(remove_dependence(i, epa_kernel(seq(0,i),i), unseason_data)))
+	unif_alphas = c(unif_alphas, estimate_alpha(mean(indep_unif_data[,i]), var(indep_unif_data[,i])))
+	tri_alphas = c(tri_alphas, estimate_alpha(mean(indep_tri_data[,i]), var(indep_tri_data[,i])))
+	epa_alphas = c(epa_alphas, estimate_alpha(mean(indep_epa_data[,i]), var(indep_epa_data[,i])))
+	unif_betas = c(unif_betas, estimate_beta(mean(indep_unif_data[,i]), var(indep_unif_data[,i])))
+	tri_betas = c(tri_betas, estimate_beta(mean(indep_tri_data[,i]), var(indep_tri_data[,i])))
+	epa_betas = c(epa_betas, estimate_beta(mean(indep_epa_data[,i]), var(indep_epa_data[,i])))
 }
-AICc_vals
-which(AICc_vals == min(AICc_vals))
-summary(estimate_weights(22, unseason_data))
-b_tn = estimate_weights(22,unseason_data)$resid
+
 
 ## Simulations
 ### Setting parameters
 a_0 = 365.25/2 # half period
-p = 10         # order
+p = 2         # order
 alpha = 5      # beta shape parameter 1
 beta = 5       # beta shape parameter 2
-l_0 = -10      # parameters for bounds
-l_1 = 20
-u_0 = 50
-u_1 = 10
+l_0 = lower_params[[1]][1]      # parameters for bounds
+l_1 = lower_params[[1]][2]
+u_0 = upper_params[[1]][1]
+u_1 = upper_params[[1]][2]
+years = 100
 ### Generating data for all orders up to p=10.  
-p = 0
-unif_data = matrix(sim_unif_beta(3650), nrow=3650) # Initializing with p=0 case
-tri_data = matrix(sim_tri_beta(3650), nrow=3650)
-epa_data = matrix(sim_epa_beta(3650), nrow=3650)
-for (i in 1:10){
+unif_sim_data = c()
+tri_sim_data = c()
+epa_sim_data = c()
+for (i in 1:2){
 	p = i # Setting order
-	unif_data = cbind(unif_data, sim_unif_beta(3650)) # Generating data
-	tri_data = cbind(tri_data, sim_tri_beta(3650))
-	epa_data = cbind(epa_data, sim_epa_beta(3650))
+	alpha = unif_alphas[i]; beta = unif_betas[i]
+	unif_sim_data = cbind(unif_sim_data, sim_unif_beta(365*years)) # Generating data
+	alpha = tri_alphas[i]; beta = tri_betas[i]
+	tri_sim_data = cbind(tri_sim_data, sim_tri_beta(365*years))
+	alpha = epa_alphas[i]; beta = epa_betas[i]
+	epa_sim_data = cbind(epa_sim_data, sim_epa_beta(365*years))
 }
+### Finding annual maxima.
+unif_maxes = c(); unif_max_inds = c()
+tri_maxes = c(); tri_max_inds = c()
+epa_maxes = c(); epa_max_inds = c()
+for (i in 1:2){
+	unif_maxes_0 = c(); unif_max_ind = c()
+	tri_maxes_0 = c(); tri_max_ind = c()
+	epa_maxes_0 = c(); epa_max_ind = c()
+	for (j in 1:years){
+		unif_max_ind = c(unif_max_ind, which(unif_sim_data[((j-1)*365+1):(j*365),i]==max(unif_sim_data[((j-1)*365+1):(j*365),i])))
+		tri_max_ind = c(tri_max_ind, which(tri_sim_data[((j-1)*365+1):(j*365),i]==max(tri_sim_data[((j-1)*365+1):(j*365),i])))
+		epa_max_ind = c(epa_max_ind, which(epa_sim_data[((j-1)*365+1):(j*365),i]==max(epa_sim_data[((j-1)*365+1):(j*365),i])))
+		unif_maxes_0 = c(unif_maxes_0, unif_sim_data[unif_max_ind[j]])
+		tri_maxes_0 = c(tri_maxes_0, tri_sim_data[tri_max_ind[j]])
+		epa_maxes_0 = c(epa_maxes_0, epa_sim_data[epa_max_ind[j]])
+		
+	}
+	unif_maxes = cbind(unif_maxes, unif_maxes_0)
+	tri_maxes = cbind(tri_maxes, tri_maxes_0)
+	epa_maxes = cbind(epa_maxes, epa_maxes_0)
+	unif_max_inds = cbind(unif_max_inds, unif_max_ind)
+	tri_max_inds = cbind(tri_max_inds, tri_max_ind)
+	epa_max_inds = cbind(epa_max_inds, epa_max_ind)
+}
+### Fitting annual maxima to a GEV distribution.
+library(ismev)
+fit_tri_max = gev.fit(tri_maxes[,2])
+fit_epa_max = gev.fit(epa_maxes[,2])
+gev.diag(fit_tri_max)
+gev.diag(fit_epa_max)
 
 
 ## Kernel Functions
@@ -249,14 +339,21 @@ standardize_data <- function(u_0_0, u_1_0, l_0_0, l_1_0, sh, x){
 }
 
 
-## Weighting coefficients estimation function
-estimate_weights <- function(order, x){
-	reg_x = matrix(c(x[-(1:order)]), nrow=(length(x)-order))
-	for (i in 1:order){
-		reg_x = cbind(reg_x, x[(order+1-i):(length(x)-i)])
+## Dependence Removal Function
+remove_dependence <- function(order, weights, x){
+	new_x = x
+	for (i in (order+1):length(x)){
+		new_x[i] = (x[i] - sum(weights[-1]*x[(i-1):(i-order)]))/weights[1]
 	}
-	reg_x = data.frame(reg_x)
-	return(lm(X1~.+0,reg_x))
+	return(new_x)
+}
+
+## Alpha/Beta Estimation Functions
+estimate_alpha <- function(mu, sigma_sq){
+	return(mu*((mu*(1-mu))/(sigma_sq)-1))
+}
+estimate_beta <- function(mu, sigma_sq){
+	return((1-mu)*((mu*(1-mu))/(sigma_sq)-1))	
 }
 
 
